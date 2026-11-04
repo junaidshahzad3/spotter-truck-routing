@@ -27,7 +27,7 @@ def payload(**overrides):
 
 @pytest.fixture
 def fake_upstreams(monkeypatch):
-    """Real Valhalla fixture + synthetic weather: snow only west of -103 (Colorado)."""
+    """Real Valhalla fixture + synthetic weather: 48 mph wind only west of -103 (Colorado)."""
     data = json.loads((FIXTURES / "valhalla_dallas_denver.json").read_text())
     monkeypatch.setattr(valhalla, "fetch_routes", lambda *a: valhalla.parse_response(data))
 
@@ -36,9 +36,9 @@ def fake_upstreams(monkeypatch):
         n = int((end - day).total_seconds() // 3600) + 2
         out = {}
         for lat, lon in points:
-            snow = 0.6 if lon < -103 else 0.0
+            wind = 48.0 if lon < -103 else 5.0
             out[openmeteo.point_key(lat, lon)] = openmeteo.HourlySeries(
-                day, [5.0] * n, [8.0] * n, [0.0] * n, [snow] * n
+                day, [wind] * n, [wind + 10] * n, [0.0] * n, [0.0] * n
             )
         return out
 
@@ -64,10 +64,10 @@ def test_plan_happy_path(api_client, fake_upstreams):
     first = d["routes"][0]
     assert first["checkpoints"][0]["mile"] == 0
     assert first["checkpoints"][-1]["mile"] == pytest.approx(first["distance_mi"], abs=0.1)
-    # Snow in Colorado at 0.6 in/h is High, raised to Severe by the 42k lb heavy-load rule.
-    assert first["summary"]["severe_mi"] > 0
-    cp = next(c for c in first["checkpoints"] if c["risk"] == "severe")
-    assert "heavy load" in cp["reasons"][0]
+    # 48 mph wind is Severe; with a 42,000 lb load (> 30,000) the brief makes it No Travel.
+    assert first["summary"]["no_travel_mi"] > 0
+    cp = next(c for c in first["checkpoints"] if c["risk"] == "no_travel")
+    assert "over 30,000 lb" in cp["reasons"][0]
     lo, hi = cp["geometry_range"]
     assert 0 <= lo < hi <= len(first["geometry"])
     assert len(d["heatmap"]["cells"]) <= 150
@@ -78,7 +78,12 @@ def test_plan_happy_path(api_client, fake_upstreams):
 def test_plan_ranking_matches_summaries(api_client, fake_upstreams):
     d = post(api_client, payload()).json()
     keys = [
-        (rt["summary"]["severe_mi"], rt["summary"]["high_mi"], rt["summary"]["avg_risk"])
+        (
+            rt["summary"]["no_travel_mi"],
+            rt["summary"]["severe_mi"],
+            rt["summary"]["high_mi"],
+            rt["summary"]["avg_risk"],
+        )
         for rt in d["routes"]
     ]
     assert keys == sorted(keys)
@@ -134,3 +139,10 @@ def test_fewer_routes_adds_warning(api_client, fake_upstreams, monkeypatch):
     d = post(api_client, payload()).json()
     assert len(d["routes"]) == 1
     assert "1 truck route" in d["warnings"][0]
+
+
+def test_light_load_same_wind_is_only_severe(api_client, fake_upstreams):
+    d = post(api_client, payload(load_weight_lbs=20000)).json()
+    first = d["routes"][0]
+    assert first["summary"]["no_travel_mi"] == 0
+    assert first["summary"]["severe_mi"] > 0

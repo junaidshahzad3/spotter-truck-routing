@@ -5,12 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .domain import Weather
-from .risk_rules import DEFAULT_RULES, LEVELS, SCORES, RiskRules, Table
+from .risk_rules import DEFAULT_RULES, LABELS, SCORES, RiskRules, Table
 
 
 @dataclass(frozen=True)
 class FactorResult:
-    name: str  # "wind" | "gust" | "rain" | "snow"
+    name: str  # "wind" | "rain" | "snow"
     value: float
     unit: str
     level: str
@@ -26,59 +26,61 @@ class RiskResult:
 
 
 def level_for(value: float, table: Table) -> str:
-    for level, minimum in table:
-        if value >= minimum:
+    for level, threshold, strict in table:
+        if value > threshold if strict else value >= threshold:
             return level
     return "low"
 
 
-def bump(level: str) -> str:
-    return LEVELS[min(SCORES[level] + 1, len(LEVELS) - 1)]
+def worse(a: str, b: str) -> str:
+    return a if SCORES[a] >= SCORES[b] else b
 
 
-_LABEL = {"wind": "Wind", "gust": "Gusts", "rain": "Rain", "snow": "Snow"}
+_LABEL = {"wind": "Wind", "rain": "Rain", "snow": "Snow"}
 
 
 def _fmt(value: float, unit: str) -> str:
-    return f"{value:.0f} {unit}" if unit == "mph" else f"{value:.2f} {unit}"
+    if unit == "mph":  # one decimal, so 54.6 mph isn't shown as "55 mph → Severe"
+        return f"{value:.1f}".removesuffix(".0") + " mph"
+    return f"{value:.2f} {unit}"
 
 
 def classify(weather: Weather, load_lbs: float, rules: RiskRules = DEFAULT_RULES) -> RiskResult:
-    """Classify one point in time/space.
+    """Classify one checkpoint at its ETA.
 
-    Each factor is graded on its own table, load rules may raise a factor by one
-    level (only if that factor is already at least "moderate"), and the overall
-    level is the worst factor.
+    Wind, rain and snow are each graded on the brief's table. The load rules can
+    raise the wind level (never lower it). The overall level is the worst factor.
     """
     readings = (
         ("wind", weather.wind_mph, "mph", rules.wind_mph),
-        ("gust", weather.gust_mph, "mph", rules.gust_mph),
         ("rain", weather.rain_in_h, "in/h", rules.rain_in_h),
         ("snow", weather.snow_in_h, "in/h", rules.snow_in_h),
     )
-    light = load_lbs <= rules.light_load_max_lbs
-    heavy = load_lbs >= rules.heavy_load_min_lbs
 
     factors: list[FactorResult] = []
     reasons: list[tuple[int, str]] = []
-    for name, value, unit, table in readings:
-        value = max(0.0, float(value or 0.0))
+    for name, raw, unit, table in readings:
+        value = max(0.0, float(raw or 0.0))
         level = level_for(value, table)
+        text = f"{_LABEL[name]} {_fmt(value, unit)} → {LABELS[level]}"
         adjusted = False
-        load_applies = (light and name in ("wind", "gust")) or (heavy and name in ("rain", "snow"))
-        if level != "low" and load_applies:
-            new_level = bump(level)
-            adjusted = new_level != level
-            level = new_level
+        if name == "wind":
+            for rule in rules.load_rules:
+                if rule.min_mph <= value < rule.max_mph and load_lbs > rule.over_lbs:
+                    if SCORES[rule.level] > SCORES[level]:
+                        level, adjusted = rule.level, True
+                        text = (
+                            f"Wind {_fmt(value, unit)} with {load_lbs:,.0f} lb load "
+                            f"(over {rule.over_lbs:,.0f} lb) → {LABELS[level]}"
+                        )
+                    break
         factors.append(FactorResult(name, value, unit, level, adjusted))
         if level != "low":
-            text = f"{_LABEL[name]} {_fmt(value, unit)} → {level.capitalize()}"
-            if adjusted:
-                why = "light load" if name in ("wind", "gust") else "heavy load"
-                text += f" (raised for {why}, {load_lbs:,.0f} lbs)"
             reasons.append((SCORES[level], text))
 
-    worst = max(factors, key=lambda f: SCORES[f.level]).level
-    # Most severe reasons first (stable sort keeps table order on ties).
+    overall = "low"
+    for f in factors:
+        overall = worse(f.level, overall)
+    # Most severe reasons first (stable sort keeps wind/rain/snow order on ties).
     reasons.sort(key=lambda r: -r[0])
-    return RiskResult(worst, SCORES[worst], tuple(t for _, t in reasons), tuple(factors))
+    return RiskResult(overall, SCORES[overall], tuple(t for _, t in reasons), tuple(factors))

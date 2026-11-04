@@ -27,7 +27,7 @@ function EmptyState() {
       <ol className="mt-2 list-decimal space-y-1 pl-4">
         <li>We fetch up to 3 truck routes for your trip.</li>
         <li>Every 10/25/50 miles we look up the forecast for the hour the truck will be there.</li>
-        <li>Wind, gusts, rain and snow (adjusted for your load) give each stretch a risk level.</li>
+        <li>Wind, rain and snow set each stretch’s risk (Low → No Travel); strong wind with a heavy load is rated higher.</li>
         <li>The safest route is recommended; drag the heatmap slider to see conditions over 48 h.</li>
       </ol>
     </div>

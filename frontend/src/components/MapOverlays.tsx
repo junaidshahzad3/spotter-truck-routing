@@ -4,7 +4,7 @@ import { formatDateTime } from '../lib/format'
 import { RISK_COLORS, RISK_LABELS } from '../lib/risk'
 
 export function Legend() {
-  const keys = ['low', 'moderate', 'high', 'severe', 'unknown'] as const
+  const keys = ['low', 'moderate', 'high', 'severe', 'no_travel', 'unknown'] as const
   return (
     <div className="rounded-xl border border-slate-200/80 bg-white/95 px-3 py-2 shadow-md backdrop-blur">
       <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Weather risk</div>

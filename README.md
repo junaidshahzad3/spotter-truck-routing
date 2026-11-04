@@ -18,39 +18,48 @@ first request after ~15 min idle takes ~30–60 s to wake up) · **Walkthrough v
    the drive time to that point, built from Valhalla's per-maneuver times, so slow
    urban stretches are slow.
 4. Open-Meteo gives the hourly forecast **for the hour nearest each checkpoint's ETA**.
-5. The risk engine grades wind, gusts, rain and snow, applies the load rules, and takes
-   the worst factor as the checkpoint's level.
+5. The risk engine grades wind, rain and snow on the brief's table (Low → No Travel),
+   applies the brief's wind-and-load rules, and takes the worst factor as the
+   checkpoint's level.
 6. Routes are ranked: **fewest Severe miles → fewest High miles → lowest average risk →
-   shortest time**. The UI says which tie-breaker decided it.
+   shortest time**, with No Travel miles compared first. The UI says which tie-breaker decided it.
 7. The map shows the routes (the selected one coloured by risk), checkpoints with
    weather popups, a legend, a side panel with the comparison, and a **0–48 h weather
    heatmap** you can scrub or play.
 
-## Risk model
+## Risk model (from the assessment brief)
 
 All thresholds live in one file, [`backend/routing/risk_rules.py`](backend/routing/risk_rules.py).
-The boundary tests in `tests/test_risk.py` are generated from that same table, so editing
-a number keeps the tests honest.
+The tests in `backend/tests/test_risk.py` check every band edge against values copied
+by hand from the brief.
 
-| Level | Sustained wind | Gusts | Rain | Snow |
-|---|---|---|---|---|
-| Low | < 20 mph | < 35 mph | < 0.10 in/h | < 0.10 in/h |
-| Moderate | ≥ 20 mph | ≥ 35 mph | ≥ 0.10 in/h | ≥ 0.10 in/h |
-| High | ≥ 35 mph | ≥ 50 mph | ≥ 0.30 in/h | ≥ 0.50 in/h |
-| Severe | ≥ 45 mph | ≥ 60 mph | ≥ 0.50 in/h | ≥ 1.00 in/h |
+| Condition | Low | Moderate | High | Severe | No Travel |
+|---|---|---|---|---|---|
+| Wind (sustained) | < 25 mph | 25–34 | 35–44 | 45–54 | ≥ 55 mph |
+| Rain | < 0.10 in/hr | 0.10–0.25 | 0.25–0.50 | 0.50–1.00 | > 1.00 |
+| Snow | < 0.5 in/hr | 0.5–1.0 | 1.0–2.0 | 2.0–3.0 | > 3.0 |
 
-**Load rules** apply only to factors already at Moderate or worse, and raise them by one level:
-- **Light load (≤ 10,000 lbs):** wind and gust risk +1. Empty trailers are prone to blow-over.
-- **Heavy load (≥ 40,000 lbs):** rain and snow risk +1. Heavier trucks need longer stopping distances.
+**Load rules (brief):** wind ≥ 55 mph is No Travel for any load. Wind 45–54 mph with
+a load over 30,000 lb is No Travel. Wind 35–44 mph with a load over 40,000 lb is Severe.
+Load rules can only raise the wind level, never lower it. A checkpoint's level is its
+worst factor.
 
-> ⚠️ These numbers must match the assessment brief's table. If the brief differs,
-> change `risk_rules.py`; nothing else needs touching.
+How the band edges are read: each band includes its lower bound, so 0.25 in/hr of rain
+is High. The No Travel edges for rain and snow are strict ("> 1.00", "> 3.0"); the one
+for wind is not ("≥ 55"). Gusts appear in checkpoint popups but are not scored, because
+the brief's table doesn't include them.
+
+**Ranking (brief):** fewest Severe miles → fewest High miles → lowest average risk →
+shortest travel time. The brief also defines a **No Travel** level, so routes are
+compared on No Travel miles first: a route through No Travel conditions should never
+win because it has fewer "Severe" miles. If every route crosses No Travel conditions,
+the recommendation says so and suggests a different departure time.
 
 **Mile accounting.** Each checkpoint stands for the road halfway to its neighbours, so
 the stretches add up exactly to the route length. "Severe miles" is the total length
-of Severe stretches. "Average risk" is the mile-weighted mean of Low=0 … Severe=3.
-Checkpoints beyond the 16-day forecast range are shown as *No forecast* and left out of
-the totals, and the UI shows a warning when that happens.
+of Severe stretches. "Average risk" is the mile-weighted mean of Low = 0 … No Travel = 4.
+Checkpoints beyond the 16-day forecast range are shown as *No forecast*, left out of
+the totals, and flagged in a warning.
 
 ## Architecture
 
@@ -80,7 +89,7 @@ backend/
     ranking.py            summaries + ordering + reason   (pure)
     heatmap.py            <=150-cell grid x 49 hours      (pure)
     service.py            orchestration for /api/plan
-  tests/                  99 tests on real API fixtures, no network
+  tests/                  100+ tests on real API fixtures, no network
 frontend/
   src/api/                typed client (TanStack Query), Photon search
   src/components/         TripForm, PlaceInput, MapView, RoutePanel, MapOverlays
@@ -163,7 +172,6 @@ Docker host works the same way. The variables are listed in
 
 ## Limitations and next steps
 
-- The risk thresholds are documented defaults until they're checked against the brief (see above).
 - The public Valhalla and Photon servers are best-effort. For production, self-host
   Valhalla, or use a commercial truck-routing API that also knows bridge heights and
   hazmat restrictions.

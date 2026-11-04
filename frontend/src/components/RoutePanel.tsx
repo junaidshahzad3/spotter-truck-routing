@@ -9,6 +9,7 @@ function RiskBar({ route }: { route: PlannedRoute }) {
     ['moderate', s.moderate_mi],
     ['high', s.high_mi],
     ['severe', s.severe_mi],
+    ['no_travel', s.no_travel_mi],
     ['unknown', s.unknown_mi],
   ] as const
   const total = parts.reduce((a, [, v]) => a + v, 0) || 1
@@ -58,6 +59,11 @@ function RouteCard({
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-slate-900">{route.name}</span>
+          {s.no_travel_mi > 0 && (
+            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-800">
+              No Travel {formatMiles(s.no_travel_mi)}
+            </span>
+          )}
           {recommended && (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
               Recommended
@@ -100,7 +106,7 @@ export function RoutePanel({ plan, selectedId, onSelect, hovered, onHover, onFoc
         </div>
         <p className="mt-1 text-sm text-emerald-900">{plan.recommendation_reason}</p>
         <p className="mt-1 text-xs text-emerald-700/80">
-          Ranked by fewest Severe miles, then High miles, then average risk, then drive time.
+          Ranked by fewest No Travel miles, then Severe miles, then High miles, then average risk (0 Low – 4 No Travel), then travel time.
         </p>
       </section>
 

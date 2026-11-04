@@ -21,6 +21,7 @@ const riskColorExpr: maplibregl.ExpressionSpecification = [
   'moderate', RISK_COLORS.moderate,
   'high', RISK_COLORS.high,
   'severe', RISK_COLORS.severe,
+  'no_travel', RISK_COLORS.no_travel,
   RISK_COLORS.unknown,
 ]
 

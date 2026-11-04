@@ -1,6 +1,6 @@
 // Mirrors the backend contract of POST /api/plan (see backend/routing/service.py).
 
-export type RiskLevel = 'low' | 'moderate' | 'high' | 'severe'
+export type RiskLevel = 'low' | 'moderate' | 'high' | 'severe' | 'no_travel'
 export type Interval = 10 | 25 | 50
 
 export interface Place {
@@ -42,6 +42,7 @@ export interface Checkpoint {
 }
 
 export interface RouteSummary {
+  no_travel_mi: number
   severe_mi: number
   high_mi: number
   moderate_mi: number
