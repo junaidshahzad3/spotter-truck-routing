@@ -1,0 +1,10 @@
+{
+  "project": {
+    "framework": "django",
+    "language": "python"
+  },
+  "paths": {
+    "apps": "routing",
+    "settings": "project_root/settings.py"
+  }
+}
