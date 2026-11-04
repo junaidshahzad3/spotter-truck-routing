@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "architect": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["D:/Projects/architect-mcp/dist/index.js"],
+      "env": {}
+    }
+  }
+}
