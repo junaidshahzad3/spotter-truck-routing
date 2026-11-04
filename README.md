@@ -5,7 +5,8 @@ time the truck will actually be there** is kindest to.
 
 ![Dallas → Denver plan with risk-coloured checkpoints and the weather heatmap](docs/screenshot.jpg)
 
-**Live app:** _TBD after deploy_ · **Walkthrough video:** _TBD (Loom)_
+**Live app:** https://spotter-truck-routing-vh98.onrender.com (Render free tier: the
+first request after ~15 min idle takes ~30–60 s to wake up) · **Walkthrough video:** _TBD (Loom)_
 
 ## What it does
 
