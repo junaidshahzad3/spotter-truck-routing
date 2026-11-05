@@ -1,0 +1,62 @@
+[
+  {
+    "id": "01-intro",
+    "title": "Weather-Aware Truck Routing",
+    "text": "Hi, this is a walkthrough of Weather-Aware Truck Routing, my take-home project for Spotter AI's full stack role. It's a React and Django app that helps a truck driver pick the safest route, based on the forecast at the time the truck will actually reach each part of the trip, the load weight, and travel time. I'll demo the app first, then walk through the risk and ranking logic, the tests, and how it's built and deployed."
+  },
+  {
+    "id": "02-form",
+    "title": "1 · Trip details",
+    "text": "The driver enters an origin and a destination. Place search uses Photon, which is designed for type-ahead. Then the departure date and time, the load weight in pounds, and how often to sample the weather along the way: every ten, twenty-five, or fifty miles. The default is twenty-five."
+  },
+  {
+    "id": "03-plan",
+    "title": "2 · Planning the trip",
+    "text": "When I press Plan routes, the backend asks Valhalla, an open-source routing engine, for three truck routes. It places a checkpoint every twenty-five miles on each route, works out the truck's arrival time at each checkpoint from Valhalla's own drive times for each road segment, and looks up the Open-Meteo forecast for that exact hour."
+  },
+  {
+    "id": "04-results",
+    "title": "3 · Recommendation",
+    "text": "On the left is the recommended route and the reason it was chosen, followed by a card for each route: its Severe and High risk miles, average risk, distance, drive time, and arrival. Routes are ranked exactly as the brief asks. Fewest Severe miles first, then fewest High miles, then lowest average risk, then shortest travel time. The brief also defines a No Travel level, so No Travel miles are compared before anything else. A route through No Travel conditions should never win."
+  },
+  {
+    "id": "05-map",
+    "title": "4 · Routes and checkpoints on the map",
+    "text": "On the map, the selected route is colored by the risk at each checkpoint, and the alternatives are shown in grey. I can switch routes from the cards, or by clicking a route on the map. Below the cards is every checkpoint with its arrival time and risk level. Clicking one flies the map to it and opens the details: wind, rain, and snow at the arrival hour, and the reasons behind its risk level."
+  },
+  {
+    "id": "06-heatmap",
+    "title": "5 · 0–48 hour weather heatmap",
+    "text": "At the bottom is the weather heatmap along the trip corridor, with a forecast slider from zero to forty-eight hours after departure. The whole grid arrives in the same response as the routes, so scrubbing and playback run entirely in the browser with no extra requests, which keeps it smooth."
+  },
+  {
+    "id": "07-rules",
+    "title": "6 · Risk rules from the brief",
+    "text": "Now the logic. All the thresholds live in one file, risk rules dot p y, copied from the brief. Wind, rain, and snow each have five bands, from Low to No Travel. The load rules are here too. Fifty-five miles an hour or more is No Travel for any load. Forty-five to fifty-four, with more than thirty thousand pounds, is No Travel. And thirty-five to forty-four, with more than forty thousand pounds, is Severe."
+  },
+  {
+    "id": "08-classifier",
+    "title": "7 · The classifier",
+    "text": "The classifier is a pure function. It grades each factor on its table, applies the load rules, which can only raise the wind level, never lower it, and takes the worst factor as the checkpoint's level. It also returns plain-English reasons, which is what the map popups display."
+  },
+  {
+    "id": "09-tests",
+    "title": "8 · Tests",
+    "text": "The tests check every band edge, exactly at, just below, and just above each threshold, plus every load rule, against values copied by hand from the brief, so a typo in the rules file can't make its own tests pass. All of the routing, weather, and ranking logic is plain functions tested on recorded API responses, so the hundred and two backend tests run in a couple of seconds, without the network."
+  },
+  {
+    "id": "10-ranking",
+    "title": "9 · Ranking",
+    "text": "Ranking summarizes each route by the miles at each risk level. Each checkpoint stands for the road halfway to its neighbors, so the stretches add up exactly to the route length. It then sorts by the brief's criteria, and writes a one-line explanation naming the criterion that decided it."
+  },
+  {
+    "id": "11-architecture",
+    "title": "10 · Architecture and decisions",
+    "text": "The README covers the architecture and the main decisions. OpenRouteService's public API caps alternative routes at one hundred kilometers, so Valhalla handles long-haul trips. Nominatim doesn't allow type-ahead, so place search uses Photon. Open-Meteo is free, needs no key, and accepts many coordinates in one request. The backend is stateless, with a single plan endpoint, and it caches results and throttles calls to stay within the public servers' limits."
+  },
+  {
+    "id": "12-wrap",
+    "title": "11 · Deployment and next steps",
+    "text": "Django serves the built React app from a single Docker image deployed on Render, and GitHub Actions runs linting, the backend tests, and the frontend build on every push. Known limits: forecasts are hourly, and the public routing server is best effort. Next, I'd add departure-time optimization: trying a few departure times and recommending the safest window. Thanks for watching."
+  }
+]
